@@ -110,7 +110,11 @@
     NSString *error = nil;
     NSString *suberror = nil;
 	
+<<<<<<< HEAD
     [self validateAttributeParameters:tagName withUri:theURI reason:&error subreason:&suberror];
+=======
+    [TiDOMNodeProxy validateAttributeParameters:tagName withUri:theURI reason:&error subreason:&suberror];
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
     if (error != nil) {
         [self throwException:error subreason:suberror location:CODELOCATION];
     }
@@ -225,7 +229,11 @@
     
     NSString *error = nil;
     NSString *suberror = nil;
+<<<<<<< HEAD
     [self validateElementParameters:tagName withUri:theURI reason:&error subreason:&suberror];
+=======
+    [TiDOMNodeProxy validateElementParameters:tagName withUri:theURI reason:&error subreason:&suberror];
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
     if (error != nil) {
         [self throwException:error subreason:suberror location:CODELOCATION];
     }
@@ -255,6 +263,11 @@
     xmlNsPtr theNewNs = xmlNewNs(NULL, // parent node
                                  href, pre);
     [resultElement XMLNode]->ns = theNewNs;
+<<<<<<< HEAD
+=======
+    //Assume that this NS is defined on this node. Will be fixed later when added to tree
+    [resultElement XMLNode]->nsDef = theNewNs;
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
     [result setDocument:[self document]];
     [result setElement:resultElement];
     [TiDOMNodeProxy setNode:result forXMLNode:[resultElement XMLNode]];

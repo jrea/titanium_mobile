@@ -68,6 +68,15 @@ NSArray* moviePlayerKeys = nil;
 	[super _initWithProperties:properties];
 }
 
+/**
+ Legacy class that needs to do the subView insertion checks.
+ TODO: Implement wrapperView code.
+*/
+-(BOOL)optimizeSubviewInsertion
+{
+    return NO;
+}
+
 -(void)_destroy
 {
 	if (playing) {
@@ -136,10 +145,6 @@ NSArray* moviePlayerKeys = nil;
 			   name:MPMoviePlayerPlaybackStateDidChangeNotification 
 			 object:movie];
 	
-	[nc addObserver:self selector:@selector(handleRotationNotification:)
-			   name:UIApplicationDidChangeStatusBarOrientationNotification
-			 object:nil];
-		
 		//FIXME: add to replace preload for 3.2
 		//MPMediaPlaybackIsPreparedToPlayDidChangeNotification
 }
@@ -384,7 +389,7 @@ NSArray* moviePlayerKeys = nil;
 		}
 		else
 		{
-			NSLog(@"[ERROR] unsupported blob for video player. %@",media_);
+			NSLog(@"[ERROR] Unsupported blob for video player: %@",media_);
 		}
 	}
 	else 
@@ -493,6 +498,26 @@ NSArray* moviePlayerKeys = nil;
 	else {
 		[loadProperties setValue:value forKey:@"useApplicationAudioSession"];
 	}
+}
+
+-(NSNumber *)volume
+{
+	__block double volume = 1.0;
+	TiThreadPerformOnMainThread(^{
+		volume = (double)[[MPMusicPlayerController applicationMusicPlayer] volume];
+	}, YES);
+	
+	return NUMDOUBLE(volume);
+}
+
+-(void)setVolume:(NSNumber *)newVolume
+{
+	double volume = [TiUtils doubleValue:newVolume def:-1.0];
+	ENSURE_VALUE_RANGE(volume, 0.0, 1.0);
+
+	TiThreadPerformOnMainThread(^{
+		[[MPMusicPlayerController applicationMusicPlayer] setVolume:volume];
+	}, NO);
 }
 
 -(void)cancelAllThumbnailImageRequests:(id)value
@@ -875,13 +900,14 @@ NSArray* moviePlayerKeys = nil;
 	}
 }
 
--(void)handleRotationNotification:(NSNotification*)note
+-(void)resizeRootView
 {
-	// Only track if we're fullscreen
-	if (movie != nil) {
-		hasRotated = [movie isFullscreen];
-	}
+    TiThreadPerformOnMainThread(^{
+        [[[TiApp app] controller] resizeViewForStatusBarHidden];
+        [[[TiApp app] controller] repositionSubviews];
+    }, NO);
 }
+
 
 -(void)handleFullscreenEnterNotification:(NSNotification*)note
 {
@@ -893,7 +919,6 @@ NSArray* moviePlayerKeys = nil;
 		[event setObject:NUMBOOL(YES) forKey:@"entering"];
 		[self fireEvent:@"fullscreen" withObject:event];
 	}	
-	hasRotated = NO;
     statusBarWasHidden = [[UIApplication sharedApplication] isStatusBarHidden];
 }
 
@@ -907,14 +932,9 @@ NSArray* moviePlayerKeys = nil;
 		[event setObject:NUMBOOL(NO) forKey:@"entering"];
 		[self fireEvent:@"fullscreen" withObject:event];
 	}	
-	if (hasRotated) {
-        // Because of the way that status bar visibility could be toggled by going in/out of fullscreen mode in video player,
-        // (and depends on whether or not DONE is clicked as well) we have to manually calculate and set the root controller's
-        // frame based on whether or not the status bar was visible when we entered fullscreen mode.
-        [[[TiApp app] controller] resizeViewForStatusBarHidden:statusBarWasHidden];
-		[[[TiApp app] controller] repositionSubviews];
-	}
-	hasRotated = NO;
+	[[UIApplication sharedApplication] setStatusBarHidden:statusBarWasHidden];
+    
+    [self performSelector:@selector(resizeRootView) withObject:nil afterDelay:[[UIApplication sharedApplication] statusBarOrientationAnimationDuration]];
 }
 
 -(void)handleSourceTypeNotification:(NSNotification*)note

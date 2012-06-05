@@ -86,30 +86,6 @@ methods:
         type: Dictionary<Titanium.Android.PendingIntent>
         optional: true
 
-  - name: createPendingIntent
-    summary: |
-        Creates a [PendingIntent](Titanium.Android.PendingIntent) to be used inside a
-        [Notification](Titanium.Android.Notification).
-    description: |
-        If `FLAG_NO_CREATE` is specified and no matching pending intent exists, returns
-        `null`.
-    returns:
-        type: Titanium.Android.PendingIntent
-    parameters:
-
-      - name: intent
-        summary: The `Intent` to be executed when the user clicks on the notification.
-        type: Titanium.Android.Intent
-
-      - name: flags
-        default: 0
-        optional: true
-        summary: |
-            Can be any of <Titanium.Android.FLAG_CANCEL_CURRENT>,
-            <Titanium.Android.FLAG_NO_CREATE>, <Titanium.Android.FLAG_ONE_SHOT>,
-            <Titanium.Android.FLAG_UPDATE_CURRENT>. Any of the `FILL_IN` constants may
-            also be specified. Specify multiple values as a bitwise OR of the values.
-        type: Number
 
   - name: createService
     summary: Create a <Titanium.Android.Service> so you can start/stop it and listen for events from it.
@@ -1328,6 +1304,8 @@ properties:
     summary: Accessor for Android system resources.
     type: Titanium.Android.R
     permission: read-only
+    accessors: false
+
   - name: RESULT_CANCELED
     summary: |
         Used with [setResult](Titanium.Android.Activity.setResult) to specify that
@@ -1421,8 +1399,53 @@ properties:
     type: Number
     permission: read-only
 
+  - name: STREAM_ALARM
+    summary: |
+        Use with [audioStreamType](Titanium.Android.Notification.audioStreamType) to
+        request that the alarm stream type for notifications be used.
+    type: Number
+    permission: read-only
+
   - name: STREAM_DEFAULT
-    summary: Use with [audioStreamType](Titanium.Android.Notification.audioStreamType) to request that the default stream type for notifications be used.
+    summary: |
+        Use with [audioStreamType](Titanium.Android.Notification.audioStreamType) to request that the 
+        default stream type for notifications be used.
+    type: Number
+    permission: read-only
+
+
+  - name: STREAM_MUSIC
+    summary: |
+        Use with [audioStreamType](Titanium.Android.Notification.audioStreamType) to
+        request that the music stream type for notifications be used.
+    type: Number
+    permission: read-only
+
+  - name: STREAM_NOTIFICATION
+    summary: |
+        Use with [audioStreamType](Titanium.Android.Notification.audioStreamType) to request that the 
+        notification stream type for notifications be used.
+    type: Number
+    permission: read-only
+
+  - name: STREAM_RING
+    summary: |
+        Use with [audioStreamType](Titanium.Android.Notification.audioStreamType) to request that the 
+        ring stream type for notifications be used.
+    type: Number
+    permission: read-only
+
+  - name: STREAM_SYSTEM
+    summary: |
+        Use with [audioStreamType](Titanium.Android.Notification.audioStreamType) to request that the 
+        system stream type for notifications be used.
+    type: Number
+    permission: read-only
+
+  - name: STREAM_VOICE_CALL
+    summary: |
+        Use with [audioStreamType](Titanium.Android.Notification.audioStreamType) to request that the 
+        voice call stream type for notifications be used.
     type: Number
     permission: read-only
 

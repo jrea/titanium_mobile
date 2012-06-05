@@ -202,4 +202,8 @@ summary: |
 properties: 
   - name: error 
     summary: Description of the error.
+<<<<<<< HEAD
     type: String
+=======
+    type: String
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8

@@ -70,6 +70,7 @@
 @end
 
 @implementation TiUIScrollView
+@synthesize contentWidth;
 
 - (void) dealloc
 {
@@ -110,7 +111,9 @@
 
 -(void)setNeedsHandleContentSizeIfAutosizing
 {
-	if (TiDimensionIsAuto(contentWidth) || TiDimensionIsAuto(contentHeight))
+	if (TiDimensionIsAuto(contentWidth) || TiDimensionIsAuto(contentHeight) ||
+        TiDimensionIsAutoSize(contentWidth) || TiDimensionIsAutoSize(contentHeight) ||
+        TiDimensionIsUndefined(contentWidth) || TiDimensionIsUndefined(contentHeight))
 	{
 		[self setNeedsHandleContentSize];
 	}
@@ -138,6 +141,9 @@
 
 -(void)handleContentSize
 {
+	if (!needsHandleContentSize) {
+		return;
+	}
 	CGSize newContentSize = [self bounds].size;
 	CGFloat scale = [scrollView zoomScale];
 
@@ -148,11 +154,14 @@
 			newContentSize.width = MAX(newContentSize.width,contentWidth.value);
 			break;
 		}
-		case TiDimensionTypeAuto:
+        case TiDimensionTypeUndefined:
+        case TiDimensionTypeAutoSize:
+		case TiDimensionTypeAuto: // TODO: This may break the layout spec for content "auto"
 		{
 			newContentSize.width = MAX(newContentSize.width,[(TiViewProxy *)[self proxy] autoWidthForSize:[self bounds].size]);
 			break;
 		}
+        case TiDimensionTypeAutoFill: // Assume that "fill" means "fill scrollview bounds"; not in spec
 		default: {
 			break;
 		}
@@ -165,11 +174,14 @@
 			minimumContentHeight = contentHeight.value;
 			break;
 		}
-		case TiDimensionTypeAuto:
+        case TiDimensionTypeUndefined:
+        case TiDimensionTypeAutoSize:
+		case TiDimensionTypeAuto: // TODO: This may break the layout spec for content "auto"            
 		{
 			minimumContentHeight=[(TiViewProxy *)[self proxy] autoHeightForSize:[self bounds].size];
 			break;
 		}
+        case TiDimensionTypeAutoFill: // Assume that "fill" means "fill scrollview bounds"; not in spec           
 		default:
 			minimumContentHeight = newContentSize.height;
 			break;
@@ -183,7 +195,7 @@
 	wrapperBounds.size = newContentSize;
 	[wrapperView setFrame:wrapperBounds];
 	needsHandleContentSize = NO;
-	[(TiViewProxy *)[self proxy] layoutChildren:NO];
+	[(TiUIScrollViewProxy *)[self proxy] layoutChildrenAfterContentSize:NO];
 }
 
 -(void)frameSizeChanged:(CGRect)frame bounds:(CGRect)visibleBounds
@@ -191,6 +203,27 @@
 	//Treat this as a size change
 	[(TiViewProxy *)[self proxy] willChangeSize];
     [super frameSizeChanged:frame bounds:visibleBounds];
+}
+
+-(void)scrollToBottom
+{
+    /*
+     * Calculate the bottom height & width and, sets the offset from the 
+     * content view’s origin that corresponds to the receiver’s origin.
+     */ 
+    UIScrollView *currScrollView = [self scrollView];
+    
+    CGSize svContentSize = currScrollView.contentSize;
+    CGSize svBoundSize = currScrollView.bounds.size;
+    CGFloat svBottomInsets = currScrollView.contentInset.bottom;
+    
+    CGFloat bottomHeight = svContentSize.height - svBoundSize.height + svBottomInsets;
+    CGFloat bottomWidth = svContentSize.width - svBoundSize.width;
+
+    CGPoint newOffset = CGPointMake(bottomWidth,bottomHeight);
+    
+    [currScrollView setContentOffset:newOffset animated:YES];
+    
 }
 
 -(void)setContentWidth_:(id)value

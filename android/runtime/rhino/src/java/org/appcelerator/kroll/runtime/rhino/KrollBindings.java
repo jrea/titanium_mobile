@@ -23,9 +23,11 @@ import org.appcelerator.kroll.runtime.rhino.js.rhino;
 import org.appcelerator.kroll.runtime.rhino.js.sha1;
 import org.appcelerator.kroll.runtime.rhino.js.tab;
 import org.appcelerator.kroll.runtime.rhino.js.titanium;
+import org.appcelerator.kroll.runtime.rhino.js.console;
 import org.appcelerator.kroll.runtime.rhino.js.ui;
 import org.appcelerator.kroll.runtime.rhino.js.url;
 import org.appcelerator.kroll.runtime.rhino.js.vm;
+import org.appcelerator.kroll.runtime.rhino.js.webview;
 import org.appcelerator.kroll.runtime.rhino.js.window;
 import org.appcelerator.kroll.runtime.rhino.js.yahoo;
 import org.appcelerator.kroll.runtime.rhino.modules.AssetsModule;
@@ -82,10 +84,12 @@ public class KrollBindings
 		addJsBinding("sha1", sha1.class);
 		addJsBinding("tab", tab.class);
 		addJsBinding("titanium", titanium.class);
+		addJsBinding("console", console.class);
 		addJsBinding("ui", ui.class);
 		addJsBinding("url", url.class);
 		addJsBinding("vm", vm.class);
 		addJsBinding("window", window.class);
+		addJsBinding("webview", webview.class);
 		addJsBinding("yahoo", yahoo.class);
 	}
 

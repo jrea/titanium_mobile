@@ -90,6 +90,7 @@ timodule.xml.
 	<property name="ti.module.root" location="${basedir}"/>
 
 	<property file="${ti.module.root}/build.properties"/>
+	<property name="android.jar" location="${android.platform}/android.jar"/>
 	<property name="ti.module.support.dir" location="${titanium.platform}/../module"/>
 
 	<!-- the manifest format seems to be compatible w/ the properties format -->
@@ -102,13 +103,17 @@ timodule.xml.
 			<pathelement location="${ti.module.support.dir}/android/ant-contrib-1.0b3.jar" />
 		</classpath>
 	</taskdef>
-
+	
 	<property name="src" location="${ti.module.root}/src"/>
 	<property name="build" location="${ti.module.root}/build"/>
 	<property name="gen" location="${build}/generated"/>
 	<property name="genjson" location="${build}/generated/json"/>
 	<property name="genjava" location="${build}/generated/java"/>
 	<property name="genjni" location="${build}/generated/jni"/>
+<<<<<<< HEAD
+=======
+	<property name="genjni.local" location="${genjni}-local"/>
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
 	<property name="genjs" location="${build}/generated/js"/>
 	<property name="classes" location="${build}/classes"/>
 	<property name="docs" location="${build}/docs"/>
@@ -129,7 +134,7 @@ timodule.xml.
 			<include name="*.jar"/>
 			<include name="modules/titanium-*.jar"/>
 		</fileset>
-		<pathelement path="${android.platform}/android.jar"/>
+		<pathelement path="${android.jar}"/>
 		<pathelement path="${google.apis}/libs/maps.jar"/>
 	</path>
 
@@ -147,6 +152,8 @@ timodule.xml.
 		<javac 
 			srcdir="${src}" 
 			destdir="${classes}"
+			target="1.6"
+			source="1.6"
 			debug="${javac.debug}"
 			includeantruntime="false">
 				<compilerarg value="-processor"/>
@@ -239,6 +246,10 @@ timodule.xml.
 	</target>
 
 	<target name="pre.compile">
+<<<<<<< HEAD
+=======
+		<available file="${ti.module.root}/jni" type="dir" property="jni.local"/>
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
 		<available file="${jsmodule.source}" type="file" property="isJSModule"/>
 		<!-- If applicable, will set commonjs key value in manifest and
 		prepare a Java class that will hand-off the source code to that JavaScript
@@ -251,10 +262,16 @@ timodule.xml.
 
 	</target>
 
+<<<<<<< HEAD
 	<target name="compile" depends="process.annotations,generate.bindings,pre.compile,js.compile,ndk.build" description="Compile this module's source code">
+=======
+	<target name="compile" depends="process.annotations,generate.bindings,pre.compile,js.compile,ndk.build,ndk.build.local" description="Compile this module's source code">
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
 		<javac 
 			destdir="${classes}"
 			debug="${javac.debug}"
+			target="1.6"
+			source="1.6"
 			includeantruntime="false">
 			<src path="${src}" />
 			<src path="${genjava}" />
@@ -289,12 +306,40 @@ timodule.xml.
 			</condition>
 		</sequential>
 	</macrodef>
+	
+	<macrodef name="build.ndk">
+		<attribute name="gendir"/>
+		<sequential>
+			<condition property="ndk.build" 
+				value="${ndk.path}/ndk-build.cmd" 
+				else="${ndk.path}/ndk-build">
+				<os family="windows"/>
+			</condition>
+			
+			<property name="mobilesdk.dir" location="${titanium.platform}/.."/>
+			<property name="ndk.verbose" value="0"/>
+			<property name="tmpdir" value="${java.io.tmpdir}/${user.name}/${ant.project.name}-generated" />
 
+			<mkdir dir="${tmpdir}" />
+			<copy todir="${tmpdir}" preservelastmodified="true" overwrite="true" includeEmptyDirs="true">
+				<fileset dir="@{gendir}"/>
+			</copy>
+			<exec executable="${ndk.build}" dir="${tmpdir}" failonerror="true">
+				<arg value="TI_MOBILE_SDK=${mobilesdk.dir}"/>
+				<arg value="NDK_PROJECT_PATH=${tmpdir}"/>
+				<arg value="NDK_APPLICATION_MK=${tmpdir}/Application.mk"/>
+				<arg value="PYTHON=${python.exec}"/>
+				<arg value="V=${ndk.verbose}"/>
+			</exec>
+
+			<move todir="@{gendir}" preservelastmodified="true" overwrite="true" includeEmptyDirs="true">
+				<fileset dir="${tmpdir}"/>
+			</move>
+		</sequential>
+	</macrodef>
+	
 	<target name="ndk.build">
 		<check.ndk/>
-		<condition property="ndk.build" value="${ndk.path}/ndk-build.cmd" else="${ndk.path}/ndk-build">
-			<os family="windows"/>
-		</condition>
 
 		<mkdir dir="${genjni}"/>
 		<property name="module.generated.dir"
@@ -323,17 +368,8 @@ timodule.xml.
 			file="${module.generated.dir}/Android.mk">
 			<filterset refid="ndk.filter"/>
 		</copy>
-
-		<property name="mobilesdk.dir" location="${titanium.platform}/.."/>
-		<property name="ndk.verbose" value="0"/>
-
-		<exec executable="${ndk.build}" dir="${gen}" failonerror="true">
-			<arg value="TI_MOBILE_SDK=${mobilesdk.dir}"/>
-			<arg value="NDK_PROJECT_PATH=${gen}"/>
-			<arg value="NDK_APPLICATION_MK=${gen}/Application.mk"/>
-			<arg value="PYTHON=${python.exec}"/>
-			<arg value="V=${ndk.verbose}"/>
-		</exec>
+		
+		<build.ndk gendir="${gen}"/>
 
 		<copy todir="${libs}">
 			<fileset dir="${gen}/libs">
@@ -370,6 +406,27 @@ timodule.xml.
 		</python>
 
 	</target>
+<<<<<<< HEAD
+=======
+
+	<target name="ndk.build.local" if="${jni.local}">
+		<check.ndk/>
+		<mkdir dir="${genjni.local}"/>
+		<copy todir="${genjni.local}">
+			<fileset dir="${ti.module.root}/jni">
+				<include name="**"/>
+			</fileset>
+		</copy>
+		
+		<build.ndk gendir="${genjni.local}"/>
+
+		<copy todir="${libs}">
+			<fileset dir="${genjni.local}/libs">
+				<include name="**/*.so"/>
+			</fileset>
+		</copy>
+	</target>
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
 
 	<target name="libs.check">
 		<condition property="libs.exists">

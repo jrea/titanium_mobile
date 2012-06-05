@@ -13,14 +13,57 @@ import org.appcelerator.titanium.util.TiActivitySupport;
 import org.appcelerator.titanium.util.TiRHelper;
 
 import android.content.res.Configuration;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Bundle;
+import android.view.Window;
 
 public class TiRootActivity extends TiLaunchActivity
 	implements TiActivitySupport
 {
 	private static final String LCAT = "TiRootActivity";
 	private static final boolean DBG = TiConfig.LOGD;
+	private boolean finishing = false;
+
+	private Drawable[] backgroundLayers = {null, null};
+
+	public void setBackgroundColor(int color)
+	{
+		Window window = getWindow();
+		if (window == null) {
+			return;
+		}
+
+		Drawable colorDrawable = new ColorDrawable(color);
+		backgroundLayers[0] = colorDrawable;
+
+		if (backgroundLayers[1] != null) {
+			window.setBackgroundDrawable(new LayerDrawable(backgroundLayers));
+		} else {
+			window.setBackgroundDrawable(colorDrawable);
+		}
+	}
+
+	public void setBackgroundImage(Drawable image)
+	{
+		Window window = getWindow();
+		if (window == null) {
+			return;
+		}
+
+		backgroundLayers[1] = image;
+		if (image == null) {
+			window.setBackgroundDrawable(backgroundLayers[0]);
+			return;
+		}
+
+		if (backgroundLayers[0] != null) {
+			window.setBackgroundDrawable(new LayerDrawable(backgroundLayers));
+		} else {
+			window.setBackgroundDrawable(image);
+		}
+	}
 
 	@Override
 	public String getUrl()
@@ -108,6 +151,19 @@ public class TiRootActivity extends TiLaunchActivity
 			Log.d(LCAT, "root activity onDestroy, activity = " + this);
 		}
 		TiFastDev.onDestroy();
+	}
+
+	@Override
+	public void finish()
+	{
+		// Ensure we only run the finish logic once. We want to avoid an infinite loop since this method can be called
+		// from the finish method inside TiBaseActivity ( which can be triggered by terminateActivityStack() )
+		if (!finishing) {
+			finishing = true;
+			TiApplication.removeFromActivityStack(this);
+			TiApplication.terminateActivityStack();
+			super.finish();
+		}
 	}
 
 }

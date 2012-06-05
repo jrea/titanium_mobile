@@ -169,7 +169,6 @@
 	// happen after the JS context is fully up and ready
 	if (contextReady && context!=nil)
 	{
-		[self fireFocus:YES];
 		return YES;
 	}
 	
@@ -212,7 +211,7 @@
 		}
 		else 
 		{
-			NSLog(@"[ERROR] url not supported in a window. %@",url);
+			DebugLog(@"[ERROR] Url not supported in a window. %@",url);
 		}
 	}
 	
@@ -336,7 +335,7 @@
 	[self replaceValue:[self sanitizeURL:value] forKey:@"barImage" notification:NO];
 	if (controller!=nil)
 	{
-		TiThreadPerformOnMainThread(^{[self updateBarImage];}, [NSThread isMainThread]);
+		TiThreadPerformOnMainThread(^{[self updateBarImage];}, NO);
 	}
 }
 

@@ -13,17 +13,22 @@
  */
 
 define(
-	["Ti/_", "Ti/_/analytics", "Ti/App", "Ti/_/Evented", "Ti/_/lang", "Ti/_/ready", "Ti/_/style", "Ti/Buffer", "Ti/Platform", "Ti/UI", "Ti/Locale", "Ti/_/include"],
-	function(_, analytics, App, Evented, lang, ready, style, Buffer, Platform, UI) {
+	["Ti/_", "Ti/API", "Ti/_/analytics", "Ti/App", "Ti/_/Evented", "Ti/_/lang", "Ti/_/ready", "Ti/_/style", "Ti/Buffer", "Ti/Platform", "Ti/UI", "Ti/Locale", "Ti/_/include"],
+	function(_, API, analytics, App, Evented, lang, ready, style, Buffer, Platform, UI) {
 
 	var global = window,
+<<<<<<< HEAD
 		cfg = require.config,
 		deployType = cfg.app.deployType,
+=======
+		req = require,
+		cfg = req.config,
+		deployType = App.deployType,
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
 		ver = cfg.ti.version,
-		is = require.is,
-		each = require.each,
-		has = require.has,
-		on = require.on,
+		is = req.is,
+		has = req.has,
+		on = req.on,
 		loaded,
 		unloaded,
 		showingError,
@@ -47,14 +52,14 @@ define(
 
 			include: function(files) {
 				typeof files === "array" || (files = [].concat(Array.prototype.slice.call(arguments, 0)));
-				each(files, function(f) {
+				files.forEach(function(f) {
 					require("Ti/_/include!" + f);
 				});
 			},
 
 			deferStart: function() {
 				if (loaded) {
-					console.warn("app.js already loaded!");
+					API.warn("app.js already loaded!");
 				} else {
 					var n = Math.round(Math.random()*1e12);
 					waiting.push(n);
@@ -62,7 +67,10 @@ define(
 						var p = waiting.indexOf(n);
 						~p && waiting.splice(p, 1);
 						loaded = 1;
-						waiting.length || require(cfg.main || ["app.js"]);
+						if (!waiting.length) {
+							has("ti-instrumentation") && instrumentation.stopTest(instrumentation.systemLoadTimeTest);
+							require(cfg.main || ["app.js"]);
+						}
 					};
 				}
 			}
@@ -180,21 +188,6 @@ define(
 		};
 	}
 
-	// console.*() shim	
-	console === void 0 && (console = {});
-
-	// make sure "log" is always at the end
-	each(["debug", "info", "warn", "error", "log"], function (c) {
-		console[c] || (console[c] = ("log" in console)
-			?	function () {
-					var a = Array.apply({}, arguments);
-					a.unshift(c + ":");
-					console.log(a.join(" "));
-				}
-			:	function () {}
-		);
-	});
-
 	// JSON.parse() and JSON.stringify() shim
 	if (!has("json-stringify")) {
 		function escapeString(s){
@@ -299,8 +292,7 @@ define(
 	Object.defineProperty(global, "Ti", { value: Ti, writable: false });
 	Object.defineProperty(global, "Titanium", { value: Ti, writable: false });
 
-	// print the Titanium version *after* the console shim
-	console.info("[INFO] Appcelerator Titanium " + ver + " Mobile Web");
+	API.info("Appcelerator Titanium " + ver + " Mobile Web");
 
 	// make sure we have some vendor prefixes defined
 	cfg.vendorPrefixes || (cfg.vendorPrefixes = ["", "Moz", "Webkit", "O", "ms"]);
@@ -333,24 +325,26 @@ define(
 						backgroundColor: "#f00",
 						top: "100%",
 						height: "100%",
-						layout: "vertical"
+						layout: UI._LAYOUT_CONSTRAINING_VERTICAL
 					}),
 					view,
-					button,
-					makeLabel = function(text, height, color, fontSize) {
-						win.add(UI.createLabel({
-							color: color,
-							font: { fontSize: fontSize, fontWeight: "bold" },
-							height: height,
-							left: 10,
-							right: 10,
-							textAlign: UI.TEXT_ALIGNMENT_CENTER,
-							text: text
-						}));
-					};
+					button;
+
+				function makeLabel(text, height, color, fontSize) {
+					win.add(UI.createLabel({
+						color: color,
+						font: { fontSize: fontSize, fontWeight: "bold" },
+						height: height,
+						left: 10,
+						right: 10,
+						textAlign: UI.TEXT_ALIGNMENT_CENTER,
+						text: text
+					}));
+				}
 
 				makeLabel("Application Error", "15%", "#0f0", "24pt");
-				makeLabel((e.message || "Unknown error").replace(/([^:]+:)/, "").trim() + (filename && filename !== "undefined" ? " at " + filename : "") + (line ? " (line " + line + ")" : ""), "45%", "#fff", "16pt");
+				makeLabel((e.message || "Unknown error").trim() + (filename && filename !== "undefined" ? " at " + filename : "") + (line ? " (line " + line + ")" : ""), "45%", "#fff", "16pt");
+
 				win.add(view = UI.createView({ height: "12%" }));
 				view.add(button = UI.createButton({ title: "Dismiss" }));
 				win.addEventListener("close", function() { win.destroy(); });
@@ -363,6 +357,7 @@ define(
 						showingError = 0;
 					});
 				});
+
 				makeLabel("Error messages will only be displayed during development. When your app is packaged for final distribution, no error screen will appear. Test your code!", "28%", "#000", "10pt");
 				
 				on.once(win,"postlayout", function() {
@@ -388,9 +383,9 @@ define(
 			padding: 0
 		});
 
-		if (cfg.app.analytics) {
+		if (App.analytics) {
 			// enroll event
-			if (localStorage.getItem("mobileweb_enrollSent") === null) {
+			if (localStorage.getItem("ti:enrolled") === null) {
 				// setup enroll event
 				analytics.add("ti.enroll", "ti.enroll", {
 					app_name: App.name,
@@ -403,7 +398,7 @@ define(
 					platform: Platform.name,
 					model: Platform.model
 				});
-				localStorage.setItem("mobileweb_enrollSent", true)
+				localStorage.setItem("ti:enrolled", true)
 			}
 
 			// app start event
@@ -412,9 +407,11 @@ define(
 				deploytype: deployType,
 				os: Platform.osname,
 				osver: Platform.ostype,
-				version: cfg.tiVersion,
+				version: cfg.ti.version,
+				platform: Platform.name,
+				model: Platform.model,
 				un: null,
-				app_version: cfg.appVersion,
+				app_version: App.version,
 				nettype: null
 			});
 

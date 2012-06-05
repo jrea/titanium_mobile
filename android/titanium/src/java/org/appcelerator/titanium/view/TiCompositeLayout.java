@@ -7,16 +7,22 @@
 package org.appcelerator.titanium.view;
 
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Method;
 import java.util.Comparator;
 import java.util.TreeSet;
 
 import org.appcelerator.kroll.common.Log;
 import org.appcelerator.kroll.common.TiConfig;
+import org.appcelerator.titanium.TiApplication;
 import org.appcelerator.titanium.TiC;
 import org.appcelerator.titanium.TiDimension;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.OnHierarchyChangeListener;
@@ -60,6 +66,9 @@ public class TiCompositeLayout extends ViewGroup
 	private int horizontalLayoutCurrentLeft = 0;
 	private int horizontalLayoutLineHeight = 0;
 	private boolean disableHorizontalWrap = false;
+
+	private float alpha = 1.0f;
+	private Method setAlphaMethod;
 
 	private WeakReference<TiViewProxy> proxy;
 	private static final int HAS_SIZE_FILL_CONFLICT = 1;
@@ -207,7 +216,11 @@ public class TiCompositeLayout extends ViewGroup
 		return params;
 	}
 
+<<<<<<< HEAD
 	private int getAsPercentageValue(double percentage, int value)
+=======
+	private static int getAsPercentageValue(double percentage, int value)
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
 	{
 		return (int) Math.round((percentage / 100.0) * value);
 	}
@@ -521,6 +534,12 @@ public class TiCompositeLayout extends ViewGroup
 					int newHeightSpec = MeasureSpec.makeMeasureSpec(newHeight, MeasureSpec.EXACTLY);
 					child.measure(newWidthSpec, newHeightSpec);
 				}
+
+				if (!TiApplication.getInstance().isRootActivityAvailable()) {
+					Log.w(TAG, "The root activity is no longer available.  Skipping layout pass.");
+					return;
+				}
+
 				child.layout(horizontal[0], vertical[0], horizontal[1], vertical[1]);
 
 				currentHeight += newHeight;
@@ -541,7 +560,15 @@ public class TiCompositeLayout extends ViewGroup
 	protected void onAnimationEnd()
 	{
 		super.onAnimationEnd();
-		invalidate();
+		if (Build.VERSION.SDK_INT < TiC.API_LEVEL_HONEYCOMB) {
+			// There is an android bug where animations still occur after this method. We clear it from the view to
+			// correct this. This fixes TIMOB-8324
+			// (http://stackoverflow.com/questions/4750939/android-animation-is-not-finished-in-onanimationend)
+			clearAnimation();
+			// We have to force an invalidate here for TIMOB-7412 (only for 3.0 and below). This is to prevent a
+			// background color of a view from being transparent after an animation.
+			invalidate();
+		}
 	}
 
 	// option0 is left/top, option1 is right/bottom
@@ -569,6 +596,79 @@ public class TiCompositeLayout extends ViewGroup
 			int offset = (dist - measuredSize) / 2;
 			pos[0] = layoutPosition0 + offset;
 			pos[1] = pos[0] + measuredSize;
+		}
+	}
+
+	/*
+	 * Set the opacity of the view using View.setAlpha if available.
+	 *
+	 * @param alpha the opacity of the view
+	 * @return true if opacity was set, otherwise false if View.setAlpha failed or was not available.
+	 */
+	private boolean nativeSetAlpha(float alpha)
+	{
+		if (Build.VERSION.SDK_INT < 11) {
+			// Only available in API level 11 or higher.
+			return false;
+		}
+
+		if (setAlphaMethod == null) {
+			try {
+				setAlphaMethod = getClass().getMethod("setAlpha", float.class);
+			} catch (NoSuchMethodException e) {
+				Log.w(TAG, "Unable to find setAlpha() method.", e);
+				return false;
+			}
+		}
+
+		try {
+			setAlphaMethod.invoke(this, alpha);
+		} catch (Exception e) {
+			Log.e(TAG, "Failed to call setAlpha().", e);
+			return false;
+		}
+
+		return true;
+	}
+
+	/*
+	 * Set the alpha of the view. Provides backwards compatibility
+	 * with older versions of Android which don't support View.setAlpha().
+	 *
+	 * @param alpha the opacity of the view
+	 */
+	public void setAlphaCompat(float alpha)
+	{
+		// Try using the native setAlpha() method first.
+		if (nativeSetAlpha(alpha)) {
+			return;
+		}
+
+		// If setAlpha() is not supported on this platform,
+		// use the backwards compatibility workaround.
+		// See dispatchDraw() for details.
+		this.alpha = alpha;
+	}
+
+	@Override
+	protected void dispatchDraw(Canvas canvas)
+	{
+		// To support alpha in older versions of Android (API level less than 11),
+		// create a new layer to draw the children. Specify the alpha value to use
+		// later when we transfer this layer back onto the canvas.
+		if (alpha < 1.0f) {
+			Rect bounds = new Rect();
+			getDrawingRect(bounds);
+			canvas.saveLayerAlpha(new RectF(bounds), Math.round(alpha * 255), Canvas.ALL_SAVE_FLAG);
+		}
+
+		super.dispatchDraw(canvas);
+
+		if (alpha < 1.0f) {
+			// Restore the canvas once the children have been drawn to the layer.
+			// This will draw the layer's offscreen bitmap onto the canvas using
+			// the alpha value we specified earlier.
+			canvas.restore();
 		}
 	}
 

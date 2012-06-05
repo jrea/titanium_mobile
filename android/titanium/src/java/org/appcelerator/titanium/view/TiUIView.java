@@ -38,6 +38,8 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.view.GestureDetector;
 import android.view.GestureDetector.SimpleOnGestureListener;
+import android.view.ScaleGestureDetector;
+import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -466,7 +468,7 @@ public abstract class TiUIView
 					}
 				} else {
 					if (key.equals(TiC.PROPERTY_OPACITY)) {
-						setOpacity(TiConvert.toFloat(newValue));
+						setOpacity(TiConvert.toFloat(newValue, 1f));
 					}
 					if (!nativeViewNull) {
 						nativeView.setBackgroundDrawable(null);
@@ -507,7 +509,7 @@ public abstract class TiUIView
 				applyCustomBackground();
 
 				if (key.equals(TiC.PROPERTY_OPACITY)) {
-					setOpacity(TiConvert.toFloat(newValue));
+					setOpacity(TiConvert.toFloat(newValue, 1f));
 				}
 
 			}
@@ -587,7 +589,7 @@ public abstract class TiUIView
 		initializeBorder(d, bgColor);
 
 		if (d.containsKey(TiC.PROPERTY_OPACITY) && !nativeViewNull) {
-			setOpacity(TiConvert.toFloat(d, TiC.PROPERTY_OPACITY));
+			setOpacity(TiConvert.toFloat(d, TiC.PROPERTY_OPACITY, 1f));
 
 		}
 
@@ -813,7 +815,7 @@ public abstract class TiUIView
 				TiBackgroundDrawable.Border border = background.getBorder();
 
 				if (d.containsKey(TiC.PROPERTY_BORDER_RADIUS)) {
-					float radius = TiConvert.toFloat(d, TiC.PROPERTY_BORDER_RADIUS);
+					float radius = TiConvert.toFloat(d, TiC.PROPERTY_BORDER_RADIUS, 0f);
 					if (radius > 0f && HONEYCOMB_OR_GREATER) {
 						disableHWAcceleration();
 					}
@@ -828,7 +830,7 @@ public abstract class TiUIView
 						}
 					}
 					if (d.containsKey(TiC.PROPERTY_BORDER_WIDTH)) {
-						border.setWidth(TiConvert.toFloat(d, TiC.PROPERTY_BORDER_WIDTH));
+						border.setWidth(TiConvert.toFloat(d, TiC.PROPERTY_BORDER_WIDTH, 0f));
 					}
 				}
 				//applyCustomBackground();
@@ -846,13 +848,13 @@ public abstract class TiUIView
 		if (property.equals(TiC.PROPERTY_BORDER_COLOR)) {
 			border.setColor(TiConvert.toColor(value.toString()));
 		} else if (property.equals(TiC.PROPERTY_BORDER_RADIUS)) {
-			float radius = TiConvert.toFloat(value);
+			float radius = TiConvert.toFloat(value, 0f);
 			if (radius > 0f && HONEYCOMB_OR_GREATER) {
 				disableHWAcceleration();
 			}
 			border.setRadius(radius);
 		} else if (property.equals(TiC.PROPERTY_BORDER_WIDTH)) {
-			border.setWidth(TiConvert.toFloat(value));
+			border.setWidth(TiConvert.toFloat(value, 0f));
 		}
 		//recalculate bounds since border is changed.
 		background.onBoundsChange(background.getBounds());
@@ -868,7 +870,7 @@ public abstract class TiUIView
 		motionEvents.put(MotionEvent.ACTION_CANCEL, TiC.EVENT_TOUCH_CANCEL);
 	}
 
-	private KrollDict dictFromEvent(MotionEvent e)
+	protected KrollDict dictFromEvent(MotionEvent e)
 	{
 		KrollDict data = new KrollDict();
 		data.put(TiC.EVENT_PROPERTY_X, (double)e.getX());
@@ -905,12 +907,40 @@ public abstract class TiUIView
 		}
 	}
 
-	protected void registerForTouch(final View touchable)
+	protected void registerTouchEvents(final View touchable)
 	{
-		if (touchable == null) {
-			return;
-		}
+
 		touchView = new WeakReference<View>(touchable);
+
+		final ScaleGestureDetector scaleDetector = new ScaleGestureDetector(touchable.getContext(),
+			new SimpleOnScaleGestureListener() {
+				// protect from divide by zero errors
+				long minTimeDelta = 1;
+				float minStartSpan = 1.0f;
+				float startSpan;
+
+				@Override
+				public boolean onScale(ScaleGestureDetector sgd) {
+					if (proxy.hierarchyHasListener(TiC.EVENT_PINCH)) {
+						float timeDelta = sgd.getTimeDelta() == 0 ? minTimeDelta : sgd.getTimeDelta();
+						
+						KrollDict data = new KrollDict();
+						data.put(TiC.EVENT_PROPERTY_SCALE, sgd.getCurrentSpan() / startSpan);
+						data.put(TiC.EVENT_PROPERTY_VELOCITY, (sgd.getScaleFactor() - 1.0f) / timeDelta * 1000);
+						data.put(TiC.EVENT_PROPERTY_SOURCE, proxy);
+
+						return proxy.fireEvent(TiC.EVENT_PINCH, data);
+					}
+					return false;
+				}
+				
+				@Override
+				public boolean onScaleBegin(ScaleGestureDetector sgd) {
+					startSpan = sgd.getCurrentSpan() == 0 ? minStartSpan : sgd.getCurrentSpan();
+					return true;
+				}
+			});
+
 		final GestureDetector detector = new GestureDetector(touchable.getContext(),
 			new SimpleOnGestureListener() {
 				@Override
@@ -940,6 +970,23 @@ public abstract class TiUIView
 					return false;
 				}
 				@Override
+				public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY)
+				{
+					if (DBG){
+						Log.d(LCAT, "SWIPE on " + proxy);
+					}
+					if (proxy.hierarchyHasListener(TiC.EVENT_SWIPE)) {
+						KrollDict data = dictFromEvent(e2);
+						if (Math.abs(velocityX) > Math.abs(velocityY)) {
+							data.put(TiC.EVENT_PROPERTY_DIRECTION, velocityX > 0 ? "right" : "left");
+						} else {
+							data.put(TiC.EVENT_PROPERTY_DIRECTION, velocityY > 0 ? "down" : "up");
+						}
+						return proxy.fireEvent(TiC.EVENT_SWIPE, data);
+					}
+					return false;
+				}
+				@Override
 				public void onLongPress(MotionEvent e)
 				{
 					if (DBG){
@@ -952,12 +999,20 @@ public abstract class TiUIView
 				}
 			});
 		
-		touchable.setOnTouchListener(new OnTouchListener() {
-			public boolean onTouch(View view, MotionEvent event) {
+		touchable.setOnTouchListener(new OnTouchListener()
+		{
+			public boolean onTouch(View view, MotionEvent event)
+			{
 				if (event.getAction() == MotionEvent.ACTION_UP) {
-					lastUpEvent.put(TiC.EVENT_PROPERTY_X, (double)event.getX());
-					lastUpEvent.put(TiC.EVENT_PROPERTY_Y, (double)event.getY());
+					lastUpEvent.put(TiC.EVENT_PROPERTY_X, (double) event.getX());
+					lastUpEvent.put(TiC.EVENT_PROPERTY_Y, (double) event.getY());
 				}
+
+				scaleDetector.onTouchEvent(event);
+				if (scaleDetector.isInProgress()) {
+					return true;
+				}
+
 				boolean handled = detector.onTouchEvent(event);
 				if (handled) {
 					return true;
@@ -967,33 +1022,36 @@ public abstract class TiUIView
 				if (motionEvent != null) {
 					if (event.getAction() == MotionEvent.ACTION_UP) {
 						Rect r = new Rect(0, 0, view.getWidth(), view.getHeight());
-						int actualAction = r.contains((int)event.getX(), (int)event.getY())
-							? MotionEvent.ACTION_UP : MotionEvent.ACTION_CANCEL;
+						int actualAction = r.contains((int) event.getX(), (int) event.getY()) ? MotionEvent.ACTION_UP
+							: MotionEvent.ACTION_CANCEL;
 
 						String actualEvent = motionEvents.get(actualAction);
-						if (!proxy.hasListeners(actualEvent)) {
-							return handled;
+						if (proxy.hierarchyHasListener(actualEvent)) {
+							proxy.fireEvent(actualEvent, dictFromEvent(event));
 						}
-
-						handled = proxy.fireEvent(actualEvent, dictFromEvent(event));
-						if (handled && actualAction == MotionEvent.ACTION_UP) {
-							// If this listener returns true, a click event does not occur,
-							// because part of the Android View's default ACTION_UP handling
-							// is to call performClick() which leads to invoking the click
-							// listener.  If we return true, that won't run, so we're doing it
-							// here instead.
-							touchable.performClick();
-						}
-						return handled;
 					} else {
-						if (proxy.hasListeners(motionEvent)) {
-							handled = proxy.fireEvent(motionEvent, dictFromEvent(event));
+						if (proxy.hierarchyHasListener(motionEvent)) {
+							proxy.fireEvent(motionEvent, dictFromEvent(event));
 						}
 					}
 				}
-				return handled;
+
+				// Inside View.java, dispatchTouchEvent() does not call onTouchEvent() if this listener returns true. As
+				// a result, click and other motion events do not occur on the native Android side. To prevent this, we
+				// always return false and let Android generate click and other motion events.
+				return false;
 			}
 		});
+		
+	}
+	protected void registerForTouch(final View touchable)
+	{
+		if (touchable == null) {
+			return;
+		}
+		
+		registerTouchEvents(touchable);
+		
 		// Previously, we used the single tap handling above to fire our click event.  It doesn't
 		// work: a single tap is not the same as a click.  A click can be held for a while before
 		// lifting the finger; a single-tap is only generated from a quick tap (which will also cause

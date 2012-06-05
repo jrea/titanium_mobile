@@ -190,6 +190,8 @@ DEFINE_EXCEPTIONS
 	[pinchRecognizer release];
 	[leftSwipeRecognizer release];
 	[rightSwipeRecognizer release];
+	[upSwipeRecognizer release];
+	[downSwipeRecognizer release];
 	[longPressRecognizer release];
 	proxy = nil;
 	touchDelegate = nil;
@@ -549,13 +551,13 @@ DEFINE_EXCEPTIONS
 
 -(void)setVisible_:(id)visible
 {
-	self.hidden = ![TiUtils boolValue:visible];
-    
-//	Redraw ourselves if changing from invisible to visible, to handle any changes made
-	if (!self.hidden) {
-		TiViewProxy* viewProxy = (TiViewProxy*)[self proxy];
+    BOOL oldVal = self.hidden;
+    self.hidden = ![TiUtils boolValue:visible];
+    //Redraw ourselves if changing from invisible to visible, to handle any changes made
+	if (!self.hidden && oldVal) {
+        TiViewProxy* viewProxy = (TiViewProxy*)[self proxy];
         [viewProxy willEnqueue];
-	}
+    }
 }
 
 -(void)setTouchEnabled_:(id)arg
@@ -611,14 +613,11 @@ DEFINE_EXCEPTIONS
 	
 	if ([self.proxy isKindOfClass:[TiViewProxy class]] && [(TiViewProxy*)self.proxy viewReady]==NO)
 	{
-#ifdef DEBUG
-		NSLog(@"[DEBUG] animated called and we're not ready ... (will try again) %@",self);
-#endif		
+		DebugLog(@"[DEBUG] Ti.View.animate() called before view %@ was ready: Will re-attempt", self);
 		if (animationDelayGuard++ > 5)
 		{
-#ifdef DEBUG
-			NSLog(@"[DEBUG] animation guard triggered, we exceeded the timeout on waiting for view to become ready");
-#endif		
+			DebugLog(@"[DEBUG] Animation guard triggered, exceeded timeout to perform animation.");
+            animationDelayGuard = 0;
 			return;
 		}
 		[self performSelector:@selector(animate:) withObject:newAnimation afterDelay:0.01];
@@ -636,7 +635,7 @@ DEFINE_EXCEPTIONS
 	}	
 	else
 	{
-		NSLog(@"[WARN] animate called with %@ but couldn't make an animation object",newAnimation);
+		DebugLog(@"[WARN] Ti.View.animate() (view %@) could not make animation from: %@", self, newAnimation);
 	}
 }
 
@@ -832,6 +831,26 @@ DEFINE_EXCEPTIONS
 	}
 	return rightSwipeRecognizer;
 }
+-(UISwipeGestureRecognizer*)upSwipeRecognizer;
+{
+	if (upSwipeRecognizer == nil) {
+		upSwipeRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(recognizedSwipe:)];
+		[upSwipeRecognizer setDirection:UISwipeGestureRecognizerDirectionUp];
+		[self configureGestureRecognizer:upSwipeRecognizer];
+		[self addGestureRecognizer:upSwipeRecognizer];
+	}
+	return upSwipeRecognizer;
+}
+-(UISwipeGestureRecognizer*)downSwipeRecognizer;
+{
+	if (downSwipeRecognizer == nil) {
+		downSwipeRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(recognizedSwipe:)];
+		[downSwipeRecognizer setDirection:UISwipeGestureRecognizerDirectionDown];
+		[self configureGestureRecognizer:downSwipeRecognizer];
+		[self addGestureRecognizer:downSwipeRecognizer];
+	}
+	return downSwipeRecognizer;
+}
 
 -(UILongPressGestureRecognizer*)longPressRecognizer;
 {
@@ -997,9 +1016,15 @@ DEFINE_EXCEPTIONS
 	}
 }
 
+// For subclasses
+-(BOOL)touchedContentViewWithEvent:(UIEvent *)event
+{
+    return NO;
+}
+
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    if ([[event touchesForView:self] count] > 0) {
+    if ([[event touchesForView:self] count] > 0 || [self touchedContentViewWithEvent:event]) {
         [self processTouchesBegan:touches withEvent:event];
     }
     [super touchesBegan:touches withEvent:event];
@@ -1039,7 +1064,7 @@ DEFINE_EXCEPTIONS
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    if ([[event touchesForView:self] count] > 0) {
+    if ([[event touchesForView:self] count] > 0 || [self touchedContentViewWithEvent:event]) {
         [self processTouchesMoved:touches withEvent:event];
     }
     [super touchesMoved:touches withEvent:event];
@@ -1066,7 +1091,7 @@ DEFINE_EXCEPTIONS
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event 
 {
-    if ([[event touchesForView:self] count] > 0) {
+    if ([[event touchesForView:self] count] > 0 || [self touchedContentViewWithEvent:event]) {
         [self processTouchesEnded:touches withEvent:event];
     }
     [super touchesEnded:touches withEvent:event];
@@ -1094,7 +1119,7 @@ DEFINE_EXCEPTIONS
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event 
 {
-    if ([[event touchesForView:self] count] > 0) {
+    if ([[event touchesForView:self] count] > 0 || [self touchedContentViewWithEvent:event]) {
         [self processTouchesCancelled:touches withEvent:event];
     }
     [super touchesCancelled:touches withEvent:event];
@@ -1138,7 +1163,11 @@ DEFINE_EXCEPTIONS
     [gestureRecognizer setCancelsTouchesInView:NO];
 }
 
+<<<<<<< HEAD
 -(UIGestureRecognizer *)gestureRecognizerForEvent:(NSString *)event
+=======
+- (UIGestureRecognizer *)gestureRecognizerForEvent:(NSString *)event
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
 {
     if ([event isEqualToString:@"singletap"]) {
         return [self singleTapRecognizer];
@@ -1154,6 +1183,15 @@ DEFINE_EXCEPTIONS
     }
     if ([event isEqualToString:@"rswipe"]) {
         return [self rightSwipeRecognizer];
+<<<<<<< HEAD
+=======
+    }
+    if ([event isEqualToString:@"uswipe"]) {
+        return [self upSwipeRecognizer];
+    }
+    if ([event isEqualToString:@"dswipe"]) {
+        return [self downSwipeRecognizer];
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
     }
     if ([event isEqualToString:@"pinch"]) {
         return [self pinchRecognizer];
@@ -1169,6 +1207,11 @@ DEFINE_EXCEPTIONS
 	ENSURE_UI_THREAD_1_ARG(event);
     [self updateTouchHandling];
     if ([event isEqualToString:@"swipe"]) {
+<<<<<<< HEAD
+=======
+        [[self gestureRecognizerForEvent:@"uswipe"] setEnabled:YES];
+        [[self gestureRecognizerForEvent:@"dswipe"] setEnabled:YES];
+>>>>>>> 40fda3ccc87949af4eae039aa17e058371b2fea8
         [[self gestureRecognizerForEvent:@"rswipe"] setEnabled:YES];
         [[self gestureRecognizerForEvent:@"lswipe"] setEnabled:YES];
     }
